@@ -18,8 +18,8 @@ ENV NODE_ENV=production
 
 RUN corepack enable && corepack prepare yarn@3.2.3 --activate
 
-# Copier le build complet avec ses node_modules déjà installés
-COPY --from=base /app/.medusa/server ./.medusa/server
+# Copier tout le dossier .medusa pour embarquer le build serveur et le build admin
+COPY --from=base /app/.medusa ./.medusa
 COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/yarn.lock ./yarn.lock
 COPY --from=base /app/.yarnrc.yml ./.yarnrc.yml

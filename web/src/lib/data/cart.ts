@@ -157,6 +157,62 @@ export async function addToCart({
     .catch(medusaError)
 }
 
+export async function addRentalToCart({
+  productId,
+  variantId,
+  quantity,
+  countryCode,
+  startDate,
+  endDate,
+  currencyCode,
+}: {
+  productId: string
+  variantId: string
+  quantity: number
+  countryCode: string
+  startDate: string
+  endDate: string
+  currencyCode: string
+}) {
+  if (!productId || !variantId) {
+    throw new Error("Missing product or variant ID when adding rental to cart")
+  }
+
+  const cart = await getOrSetCart(countryCode)
+
+  if (!cart) {
+    throw new Error("Error retrieving or creating cart")
+  }
+
+  const headers = {
+    ...(await getAuthHeaders()),
+  }
+
+  await sdk.client
+    .fetch<{ added: boolean }>(`/store/drone-hub/rental-line-items`, {
+      method: "POST",
+      body: {
+        cart_id: cart.id,
+        product_id: productId,
+        variant_id: variantId,
+        quantity,
+        start_date: startDate,
+        end_date: endDate,
+        country_code: countryCode,
+        currency_code: currencyCode,
+      },
+      headers,
+    })
+    .then(async () => {
+      const cartCacheTag = await getCacheTag("carts")
+      revalidateTag(cartCacheTag)
+
+      const fulfillmentCacheTag = await getCacheTag("fulfillment")
+      revalidateTag(fulfillmentCacheTag)
+    })
+    .catch(medusaError)
+}
+
 export async function updateLineItem({
   lineId,
   quantity,

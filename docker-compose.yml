@@ -36,8 +36,8 @@ services:
   #   environment:
   #     DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
   #     STORE_CORS: ${STORE_CORS:-http://localhost:3000}
-  #     ADMIN_CORS: ${ADMIN_CORS:-http://localhost:7001}
-  #     AUTH_CORS: ${AUTH_CORS:-http://localhost:3000}
+  #     ADMIN_CORS: ${ADMIN_CORS:-http://localhost:7001,http://localhost:9000}
+  #     AUTH_CORS: ${AUTH_CORS:-http://localhost:3000,http://localhost:9000}
   #     JWT_SECRET: ${JWT_SECRET:-supersecret}
   #     COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
   #     REDIS_URL: ${REDIS_URL:-redis://redis:6379}
@@ -47,10 +47,6 @@ services:
   #       condition: service_healthy
   #     redis:
   #       condition: service_healthy
-  #     migrate:
-  #       condition: service_completed_successfully
-  #     seed:
-  #       condition: service_completed_successfully
   #   ports:
   #     - "9000:9000"
   #   healthcheck:
@@ -75,7 +71,7 @@ services:
   #     MEDUSA_BACKEND_URL: http://medusa:9000
   #     NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
   #     NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
-  #     NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-gb}
+  #     NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-fr}
   #   depends_on:
   #     medusa:
   #       condition: service_healthy

@@ -1,6 +1,11 @@
 import { HttpTypes } from "@medusajs/types"
 import { Heading, Text, Badge } from "@medusajs/ui"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import {
+  getDroneHubCommercialMode,
+  getDroneHubLocalizedContent,
+  getDroneHubSpecifications,
+} from "@lib/util/drone-hub"
 
 type ProductInfoProps = {
   product: HttpTypes.StoreProduct
@@ -8,16 +13,12 @@ type ProductInfoProps = {
 }
 
 const ProductInfo = ({ product, countryCode }: ProductInfoProps) => {
-  const metadata = product.metadata as any || {}
-  
-  // Détermine la langue à partir du countryCode
   const isFrench = ["fr", "be", "ch", "lu", "mc", "ca"].includes(countryCode.toLowerCase())
-  const lang = isFrench ? "fr" : "en"
-
-  // Récupère le titre et la description traduits, ou les valeurs par défaut
-  const title = metadata[`title_${lang}`] || product.title
-  const description = metadata[`description_${lang}`] || product.description
-  const mode_com = metadata.mode_commercialisation
+  const localized = getDroneHubLocalizedContent(product, countryCode)
+  const title = localized.title || product.title
+  const description = localized.description || product.description
+  const mode_com = getDroneHubCommercialMode(product)
+  const specifications = getDroneHubSpecifications(product)
 
   return (
     <div id="product-info" className="space-y-6">
@@ -60,14 +61,14 @@ const ProductInfo = ({ product, countryCode }: ProductInfoProps) => {
       </Text>
 
       {/* Spécifications */}
-      {metadata.specifications && (
+      {Object.keys(specifications).length > 0 && (
         <div className="mt-8">
           <Heading level="h3" className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             <span className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></span>
             {isFrench ? "Spécifications techniques" : "Technical specifications"}
           </Heading>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {Object.entries(metadata.specifications as Record<string, string>).map(([key, value]) => (
+            {Object.entries(specifications).map(([key, value]) => (
               <div key={key} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                 <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
                   {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ")}

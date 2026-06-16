@@ -4,8 +4,55 @@ import { sdk } from "@lib/config"
 import { sortProducts } from "@lib/util/sort-products"
 import { HttpTypes } from "@medusajs/types"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
+import { DroneHubProductProjection } from "types/drone-hub"
+import { listDroneHubProducts } from "./drone-hub"
 import { getAuthHeaders, getCacheOptions } from "./cookies"
 import { getRegion, retrieveRegion } from "./regions"
+
+const mergeDroneHubProduct = (
+  product: HttpTypes.StoreProduct,
+  businessProduct?: DroneHubProductProjection
+) => {
+  if (!businessProduct) {
+    return product
+  }
+
+  return {
+    ...product,
+    title: businessProduct.localized.title || product.title,
+    description: businessProduct.localized.description || product.description,
+    metadata: {
+      ...(product.metadata || {}),
+      drone_hub: businessProduct,
+      mode_commercialisation: businessProduct.commercial_mode,
+      tarif_location_journalier_eur: businessProduct.rental_rates.eur,
+      tarif_location_journalier_usd: businessProduct.rental_rates.usd,
+      title_fr: businessProduct.translations.fr.title,
+      title_en: businessProduct.translations.en.title,
+      description_fr: businessProduct.translations.fr.description,
+      description_en: businessProduct.translations.en.description,
+      specifications: businessProduct.specifications,
+    },
+  }
+}
+
+const enrichProductsWithDroneHubData = async (
+  products: HttpTypes.StoreProduct[],
+  countryCode?: string
+) => {
+  const businessProducts = await listDroneHubProducts({
+    ids: products.map((product) => product.id),
+    countryCode,
+  })
+
+  const businessProductsById = new Map(
+    businessProducts.map((product) => [product.id, product])
+  )
+
+  return products.map((product) =>
+    mergeDroneHubProduct(product, businessProductsById.get(product.id))
+  )
+}
 
 export const listProducts = async ({
   pageParam = 1,
@@ -14,13 +61,13 @@ export const listProducts = async ({
   regionId,
 }: {
   pageParam?: number
-  queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductListParams
+  queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductParams
   countryCode?: string
   regionId?: string
 }): Promise<{
   response: { products: HttpTypes.StoreProduct[]; count: number }
   nextPage: number | null
-  queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductListParams
+  queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductParams
 }> => {
   if (!countryCode && !regionId) {
     throw new Error("Country code or region ID is required")
@@ -71,12 +118,16 @@ export const listProducts = async ({
         cache: "force-cache",
       }
     )
-    .then(({ products, count }) => {
+    .then(async ({ products, count }) => {
+      const enrichedProducts = await enrichProductsWithDroneHubData(
+        products,
+        countryCode
+      )
       const nextPage = count > offset + limit ? pageParam + 1 : null
 
       return {
         response: {
-          products,
+          products: enrichedProducts,
           count,
         },
         nextPage: nextPage,

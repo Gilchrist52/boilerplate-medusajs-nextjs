@@ -6,6 +6,7 @@ import {
   PopoverPanel,
   Transition,
 } from "@headlessui/react"
+import { getDisplayLineItemSubtotal, isRentalLineItem } from "@lib/util/cart-totals"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 import { Button } from "@medusajs/ui"
@@ -35,26 +36,9 @@ const CartDropdown = ({
       return acc + item.quantity
     }, 0) || 0
 
-  // Calculate custom subtotal that accounts for rental items
-  const calculateCustomSubtotal = () => {
-    let subtotal = 0
-    const items = cartState?.items || []
-    
-    items.forEach((item) => {
-      const metadata = item.metadata as any || {}
-      if (metadata.type === "rental") {
-        // Use the total rental price from metadata (already in dollars/euros, convert to cents)
-        subtotal += Math.round((metadata.total_rental_price || 0) * 100) * (item.quantity || 1)
-      } else {
-        // Use Medusa's calculated subtotal for regular items (already in cents)
-        subtotal += (item.subtotal || 0)
-      }
-    })
-    
-    return subtotal
-  }
-
-  const subtotal = calculateCustomSubtotal()
+  const subtotal = (cartState?.items || []).reduce((sum, item) => {
+    return sum + getDisplayLineItemSubtotal(item)
+  }, 0)
   const itemRef = useRef<number>(totalItems || 0)
 
   const timedOpen = () => {
@@ -137,7 +121,8 @@ const CartDropdown = ({
                     })
                     .map((item) => {
                       const metadata = item.metadata as any || {}
-                      const isRental = metadata.type === "rental"
+                      const isRental = isRentalLineItem(item)
+                      const displaySubtotal = getDisplayLineItemSubtotal(item)
                       
                       return (
                         <div
@@ -179,7 +164,10 @@ const CartDropdown = ({
                                   />
                                   {isRental && metadata.rental_start && metadata.rental_end && (
                                     <span className="text-xs text-ui-fg-subtle">
-                                      Du {new Date(metadata.rental_start).toLocaleDateString()} au {new Date(metadata.rental_end).toLocaleDateString()}
+                                      {isFrench ? "Du" : "From"}{" "}
+                                      {new Date(metadata.rental_start).toLocaleDateString()}{" "}
+                                      {isFrench ? "au" : "to"}{" "}
+                                      {new Date(metadata.rental_end).toLocaleDateString()}
                                     </span>
                                   )}
                                   <span
@@ -193,7 +181,7 @@ const CartDropdown = ({
                                   {isRental ? (
                                     <span className="text-base-regular">
                                       {convertToLocale({
-                                        amount: Math.round((metadata.total_rental_price || 0) * 100) * item.quantity,
+                                        amount: displaySubtotal,
                                         currency_code: cartState.currency_code || "eur",
                                       })}
                                     </span>
@@ -212,7 +200,7 @@ const CartDropdown = ({
                               className="mt-1"
                               data-testid="cart-item-remove-button"
                             >
-                              Remove
+                              {isFrench ? "Supprimer" : "Remove"}
                             </DeleteButton>
                           </div>
                         </div>

@@ -1,15 +1,21 @@
 "use client"
 
-import { addToCart } from "@lib/data/cart"
+import { addRentalToCart, addToCart } from "@lib/data/cart"
+import { calculateRentalPricing } from "@lib/client/drone-hub"
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { HttpTypes } from "@medusajs/types"
 import { Button, Heading, RadioGroup, Label, Text } from "@medusajs/ui"
 import { EllipseMiniSolid } from "@medusajs/icons"
 import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/product-actions/option-select"
+import {
+  getDroneHubCommercialMode,
+  getDroneHubRentalRate,
+} from "@lib/util/drone-hub"
 import { isEqual } from "lodash"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { DroneHubRentalPricing } from "types/drone-hub"
 import ProductPrice from "../product-price"
 import MobileActions from "./mobile-actions"
 import { clx } from "@medusajs/ui"
@@ -39,34 +45,22 @@ export default function ProductActions({
   const [mode, setMode] = useState<"sale" | "rental">("sale")
   const [rentalStart, setRentalStart] = useState<string>("")
   const [rentalEnd, setRentalEnd] = useState<string>("")
+  const [rentalPricing, setRentalPricing] = useState<DroneHubRentalPricing | null>(null)
+  const [rentalPricingError, setRentalPricingError] = useState<string | null>(null)
+  const [isPricingRental, setIsPricingRental] = useState(false)
   const countryCode = useParams().countryCode as string
-  const metadata = product.metadata as any || {}
+  const commercialMode = getDroneHubCommercialMode(product)
 
   // Détermine la langue
   const isFrench = ["fr", "be", "ch", "lu", "mc", "ca"].includes(countryCode.toLowerCase())
-  const lang = isFrench ? "fr" : "en"
 
   // Calcul du prix de location par jour
   const dailyRentalPrice = useMemo(() => {
-    if (region.currency_code === "eur") {
-      return metadata.tarif_location_journalier_eur || 0
-    } else {
-      return metadata.tarif_location_journalier_usd || 0
-    }
-  }, [metadata, region.currency_code])
+    return getDroneHubRentalRate(product, region.currency_code)
+  }, [product, region.currency_code])
 
-  // Calcul du nombre de jours de location
-  const rentalDays = useMemo(() => {
-    if (!rentalStart || !rentalEnd) return 0
-    const start = new Date(rentalStart)
-    const end = new Date(rentalEnd)
-    const diffTime = Math.abs(end.getTime() - start.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // +1 pour inclure le jour de départ et de retour
-    return diffDays
-  }, [rentalStart, rentalEnd])
-
-  // Prix total de la location
-  const totalRentalPrice = dailyRentalPrice * rentalDays
+  const rentalDays = rentalPricing?.rental_days ?? 0
+  const totalRentalPrice = rentalPricing?.total ?? 0
 
   // If there is only 1 variant, preselect the options
   useEffect(() => {
@@ -75,6 +69,65 @@ export default function ProductActions({
       setOptions(variantOptions ?? {})
     }
   }, [product.variants])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    if (mode !== "rental") {
+      setRentalPricing(null)
+      setRentalPricingError(null)
+      setIsPricingRental(false)
+      return
+    }
+
+    if (!rentalStart || !rentalEnd) {
+      setRentalPricing(null)
+      setRentalPricingError(null)
+      setIsPricingRental(false)
+      return
+    }
+
+    setIsPricingRental(true)
+    setRentalPricingError(null)
+
+    calculateRentalPricing({
+      productId: product.id,
+      startDate: rentalStart,
+      endDate: rentalEnd,
+      countryCode,
+      currencyCode: region.currency_code,
+    })
+      .then((pricing) => {
+        if (isCancelled) {
+          return
+        }
+
+        setRentalPricing(pricing)
+      })
+      .catch((error) => {
+        if (isCancelled) {
+          return
+        }
+
+        setRentalPricing(null)
+        setRentalPricingError(
+          error instanceof Error
+            ? error.message
+            : isFrench
+              ? "Impossible de calculer le prix de location"
+              : "Unable to calculate rental pricing"
+        )
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsPricingRental(false)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [mode, rentalStart, rentalEnd, product.id, countryCode, region.currency_code, isFrench])
 
   const selectedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) {
@@ -130,14 +183,17 @@ export default function ProductActions({
   // Vérifie si le mode est disponible
   const isModeAvailable = (m: "sale" | "rental") => {
     if (m === "sale") {
-      return metadata.mode_commercialisation !== "rental"
+      return commercialMode !== "rental"
     } else {
-      return metadata.mode_commercialisation !== "sale"
+      return commercialMode !== "sale"
     }
   }
 
   // Vérifie si la location est valide
-  const isRentalValid = mode === "rental" ? (rentalStart && rentalEnd && rentalDays > 0) : true
+  const isRentalValid =
+    mode === "rental"
+      ? Boolean(rentalStart && rentalEnd && rentalPricing && rentalDays > 0 && !rentalPricingError)
+      : true
 
   const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -149,25 +205,32 @@ export default function ProductActions({
 
     setIsAdding(true)
 
-    const cartMetadata: Record<string, any> = {
-      type: mode,
+    try {
+      const cartMetadata: Record<string, any> = {
+        type: mode,
+      }
+
+      if (mode === "rental") {
+        await addRentalToCart({
+          productId: product.id,
+          variantId: selectedVariant.id,
+          quantity: 1,
+          countryCode,
+          startDate: rentalStart,
+          endDate: rentalEnd,
+          currencyCode: region.currency_code,
+        })
+      } else {
+        await addToCart({
+          variantId: selectedVariant.id,
+          quantity: 1,
+          countryCode,
+          metadata: cartMetadata,
+        })
+      }
+    } finally {
+      setIsAdding(false)
     }
-
-    if (mode === "rental") {
-      cartMetadata.rental_start = rentalStart
-      cartMetadata.rental_end = rentalEnd
-      cartMetadata.rental_days = rentalDays
-      cartMetadata.total_rental_price = totalRentalPrice
-    }
-
-    await addToCart({
-      variantId: selectedVariant.id,
-      quantity: 1,
-      countryCode,
-      metadata: cartMetadata,
-    })
-
-    setIsAdding(false)
   }
 
   return (
@@ -294,6 +357,18 @@ export default function ProductActions({
               </div>
             </div>
 
+            {isPricingRental && (
+              <Text className="text-sm text-orange-700">
+                {isFrench ? "Calcul du tarif de location..." : "Calculating rental pricing..."}
+              </Text>
+            )}
+
+            {rentalPricingError && (
+              <Text className="text-sm text-red-600">
+                {rentalPricingError}
+              </Text>
+            )}
+
             {/* Rental details */}
             {rentalDays > 0 && (
               <div className="space-y-3 mt-6">
@@ -311,7 +386,8 @@ export default function ProductActions({
                     {isFrench ? "Prix par jour" : "Price per day"}
                   </span>
                   <span className="font-semibold text-orange-600">
-                    {region.currency_code === "eur" ? "€" : "$"}{dailyRentalPrice}
+                    {region.currency_code === "eur" ? "€" : "$"}
+                    {rentalPricing?.unit_daily_price ?? dailyRentalPrice}
                   </span>
                 </div>
 
@@ -342,7 +418,8 @@ export default function ProductActions({
             !!disabled ||
             isAdding ||
             !isValidVariant ||
-            !isRentalValid
+            !isRentalValid ||
+            isPricingRental
           }
           variant="primary"
           className={clx(

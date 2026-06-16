@@ -1,4 +1,10 @@
 import { Text, Badge } from "@medusajs/ui"
+import {
+  getDroneHubCommercialMode,
+  getDroneHubLocalizedContent,
+  getDroneHubRentalRate,
+  getDroneHubSpecifications,
+} from "@lib/util/drone-hub"
 import { getProductPrice } from "@lib/util/get-product-price"
 import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -20,11 +26,13 @@ export default async function ProductPreview({
     product,
   })
 
-  const metadata = product.metadata as any || {}
-  const mode_com = metadata.mode_commercialisation
-  const isFrench = (countryCode || "fr").toLowerCase() === "fr"
-  const title =
-    metadata[isFrench ? "title_fr" : "title_en"] || product.title
+  const resolvedCountryCode = countryCode || "fr"
+  const localized = getDroneHubLocalizedContent(product, resolvedCountryCode)
+  const mode_com = getDroneHubCommercialMode(product)
+  const isFrench = resolvedCountryCode.toLowerCase() === "fr"
+  const title = localized.title || product.title
+  const specifications = getDroneHubSpecifications(product)
+  const rentalRate = getDroneHubRentalRate(product, region.currency_code)
   const detailsLabel = isFrench ? "Voir les details" : "View details"
   const bothLabel = isFrench ? "Vente & location" : "Sale & rental"
   const rentalOnlyLabel = isFrench ? "Location uniquement" : "Rental only"
@@ -78,9 +86,9 @@ export default async function ProductPreview({
           </Text>
 
           {/* Description snippet */}
-          {metadata.specifications && (
+          {Object.keys(specifications).length > 0 && (
             <Text className="text-sm text-gray-500 mb-4 line-clamp-2">
-              {Object.values(metadata.specifications).join(" • ")}
+              {Object.values(specifications).join(" • ")}
             </Text>
           )}
 
@@ -91,15 +99,15 @@ export default async function ProductPreview({
             </div>
 
             {/* Rental price if available */}
-            {metadata.tarif_location_journalier_eur && (
+            {rentalRate > 0 && (
               <div className="text-right">
                 <Text className="text-xs text-gray-400">
                   {fromLabel}
                 </Text>
                 <Text className="text-sm font-semibold text-orange-600">
                   {region.currency_code === "eur"
-                    ? `€${metadata.tarif_location_journalier_eur}/jour`
-                    : `$${metadata.tarif_location_journalier_usd}/jour`}
+                    ? `€${rentalRate}/jour`
+                    : `$${rentalRate}/jour`}
                 </Text>
               </div>
             )}
