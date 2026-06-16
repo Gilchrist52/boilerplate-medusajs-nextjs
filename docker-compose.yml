@@ -27,48 +27,6 @@ services:
       timeout: 3s
       retries: 20
 
-  migrate:
-    build:
-      context: ./medusa
-    container_name: medusa_migrate
-    env_file:
-      - ./.env
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
-      JWT_SECRET: ${JWT_SECRET:-supersecret}
-      COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
-      NODE_ENV: production
-    command: npx medusa db:migrate
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
-  seed:
-    build:
-      context: ./medusa
-    container_name: medusa_seed
-    env_file:
-      - ./.env
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
-      STORE_CORS: ${STORE_CORS:-http://localhost:3000}
-      ADMIN_CORS: ${ADMIN_CORS:-http://localhost:7001}
-      AUTH_CORS: ${AUTH_CORS:-http://localhost:3000}
-      JWT_SECRET: ${JWT_SECRET:-supersecret}
-      COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      NODE_ENV: production
-    command: npx medusa exec ./src/scripts/seed.ts
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    restart: "no"
-
   # medusa:
   #   build:
   #     context: ./medusa
