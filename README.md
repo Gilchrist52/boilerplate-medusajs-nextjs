@@ -121,7 +121,7 @@ Exemple de valeur attendue :
 pk_997469512c3cf740d72aec9bc608ed84b7281298a537c403230bc586f44baa09
 ```
 
-Ensuite, mets cette valeur dans le fichier `.env` a la racine du projet :
+Ensuite, mets cette valeur dans le fichier `.env` a la racine du projet `web/` :
 
 ```env
 NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_997469512c3cf740d72aec9bc608ed84b7281298a537c403230bc586f44baa09
