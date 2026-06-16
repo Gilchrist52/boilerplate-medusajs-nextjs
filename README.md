@@ -65,13 +65,22 @@ Les services `migrate` et `seed` ne sont plus executes automatiquement au demarr
 
 ## 3. Lancer les jobs manuellement
 
-Pour appliquer les migrations :
+Important :
+
+- `docker-compose.jobs.yml` ne doit pas etre lance seul
+- il faut d'abord demarrer la stack principale avec `docker compose up -d --build`
+- les commandes `migrate` et `seed` se lancent ensuite separement, une par une si besoin
+- chaque commande ci-dessous lance uniquement le job demande
+- on specifie aussi `docker-compose.yml` car `docker-compose.jobs.yml` depend des services declares dans le fichier principal
+- autrement dit, `docker-compose.yml` doit deja etre demarre, puis `docker-compose.jobs.yml` sert a ajouter le job voulu
+
+Pour lancer uniquement la migration :
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml up migrate
 ```
 
-Pour lancer le seed :
+Pour lancer uniquement le seed :
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml up seed
@@ -97,13 +106,13 @@ Suivre les logs de la stack principale :
 docker compose logs -f
 ```
 
-Suivre les logs des migrations :
+Suivre les logs du job `migrate` :
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml logs -f migrate
 ```
 
-Suivre les logs du seed :
+Suivre les logs du job `seed` :
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml logs -f seed
@@ -161,6 +170,7 @@ docker compose -f docker-compose.yml -f docker-compose.jobs.yml up seed
 
 Attention :
 
+- `docker-compose.yml` doit deja etre demarre
 - le seed est idempotent pour certaines donnees, comme le client par defaut
 - si tu veux repartir d'une base totalement propre, il vaut mieux supprimer les volumes puis relancer
 
@@ -197,6 +207,7 @@ Pour un premier lancement :
 ```bash
 docker compose down -v
 docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.jobs.yml up migrate
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml up seed
 docker compose ps
 docker compose -f docker-compose.yml -f docker-compose.jobs.yml logs -f seed
@@ -207,6 +218,7 @@ docker compose -f docker-compose.yml -f docker-compose.jobs.yml logs -f seed
 - `migrate` et `seed` sont defines dans `docker-compose.jobs.yml`.
 - `migrate` et `seed` sont des jobs one-shot avec `restart: "no"`.
 - `docker compose up` sur le fichier principal ne relance plus le seed automatiquement.
+- `docker-compose.jobs.yml` n'est pas autonome et suppose que `docker-compose.yml` est deja demarre.
 - Le seed utilise `medusa exec ./src/scripts/seed.ts`.
 
 ## 12. Depannage
