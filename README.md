@@ -121,7 +121,7 @@ Exemple de valeur attendue :
 pk_997469512c3cf740d72aec9bc608ed84b7281298a537c403230bc586f44baa09
 ```
 
-Ensuite, mets cette valeur dans le fichier `.env` a la racine du projet `web/` :
+Ensuite, mets cette valeur dans le fichier `web/.env.local` :
 
 ```env
 NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_997469512c3cf740d72aec9bc608ed84b7281298a537c403230bc586f44baa09
@@ -129,7 +129,7 @@ NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_997469512c3cf740d72aec9bc608ed84b7281298a5
 
 Important :
 
-- fais cette mise a jour avant de lancer `medusa` et `web`
+- fais cette mise a jour avant de lancer `web`
 - si la cle change, pense a relancer le front local
 
 ## 5. Configurer les applications en local
