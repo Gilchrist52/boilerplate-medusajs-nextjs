@@ -253,7 +253,7 @@ export default function ProductActions({
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">🛒</span>
+                  <span className="text-2xl"></span>
                   {mode === "sale" && (
                     <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
                       <span className="text-white text-xs">✓</span>
@@ -280,7 +280,7 @@ export default function ProductActions({
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">📅</span>
+                  <span className="text-2xl"></span>
                   {mode === "rental" && (
                     <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
                       <span className="text-white text-xs">✓</span>

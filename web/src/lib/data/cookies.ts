@@ -8,6 +8,10 @@ export const getAuthHeaders = async (): Promise<
     const cookies = await nextCookies()
     const token = cookies.get("_medusa_jwt")?.value
 
+    // #region debug-point A:jwt-cookie-state
+    ;(()=>{const fs=require("fs"),p=".dbg/cart-customer-404.env";let u="http://127.0.0.1:7777/event",s="cart-customer-404";try{const e=fs.readFileSync(p,"utf8");u=e.match(/DEBUG_SERVER_URL=(.+)/)?.[1]||u;s=e.match(/DEBUG_SESSION_ID=(.+)/)?.[1]||s}catch{}fetch(u,{method:"POST",body:JSON.stringify({sessionId:s,runId:"pre-fix",hypothesisId:"A",location:"web/src/lib/data/cookies.ts:getAuthHeaders",msg:"[DEBUG] auth header resolution",data:{hasToken:Boolean(token),tokenPrefix:token?.slice(0,12)??null},ts:Date.now()})}).catch(()=>{})})()
+    // #endregion
+
     if (!token) {
       return {}
     }

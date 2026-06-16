@@ -10,6 +10,7 @@ import {
   getCacheOptions,
   getCacheTag,
   getCartId,
+  removeAuthToken,
   removeCartId,
   setCartId,
 } from "./cookies"
@@ -63,13 +64,49 @@ export async function getOrSetCart(countryCode: string) {
     ...(await getAuthHeaders()),
   }
 
+  // #region debug-point B:cart-create-input
+  ;(()=>{const fs=require("fs"),p=".dbg/cart-customer-404.env";let u="http://127.0.0.1:7777/event",s="cart-customer-404";try{const e=fs.readFileSync(p,"utf8");u=e.match(/DEBUG_SERVER_URL=(.+)/)?.[1]||u;s=e.match(/DEBUG_SESSION_ID=(.+)/)?.[1]||s}catch{}fetch(u,{method:"POST",body:JSON.stringify({sessionId:s,runId:"pre-fix",hypothesisId:"B",location:"web/src/lib/data/cart.ts:getOrSetCart",msg:"[DEBUG] getOrSetCart state before create",data:{countryCode,regionId:region.id,hasExistingCart:Boolean(cart),hasAuthorization:Boolean((headers as Record<string,string>).authorization)},ts:Date.now()})}).catch(()=>{})})()
+  // #endregion
+
   if (!cart) {
-    const cartResp = await sdk.store.cart.create(
-      { region_id: region.id },
-      {},
-      headers
-    )
-    cart = cartResp.cart
+    try {
+      let cartResp = await sdk.store.cart.create(
+        { region_id: region.id },
+        {},
+        headers
+      )
+      // #region debug-point C:cart-create-success
+      ;(()=>{const fs=require("fs"),p=".dbg/cart-customer-404.env";let u="http://127.0.0.1:7777/event",s="cart-customer-404";try{const e=fs.readFileSync(p,"utf8");u=e.match(/DEBUG_SERVER_URL=(.+)/)?.[1]||u;s=e.match(/DEBUG_SESSION_ID=(.+)/)?.[1]||s}catch{}fetch(u,{method:"POST",body:JSON.stringify({sessionId:s,runId:"pre-fix",hypothesisId:"C",location:"web/src/lib/data/cart.ts:getOrSetCart",msg:"[DEBUG] cart created",data:{cartId:cartResp.cart?.id??null,regionId:cartResp.cart?.region_id??null},ts:Date.now()})}).catch(()=>{})})()
+      // #endregion
+      cart = cartResp.cart
+    } catch (error: any) {
+      // #region debug-point D:cart-create-error
+      ;(()=>{const fs=require("fs"),p=".dbg/cart-customer-404.env";let u="http://127.0.0.1:7777/event",s="cart-customer-404";try{const e=fs.readFileSync(p,"utf8");u=e.match(/DEBUG_SERVER_URL=(.+)/)?.[1]||u;s=e.match(/DEBUG_SESSION_ID=(.+)/)?.[1]||s}catch{}fetch(u,{method:"POST",body:JSON.stringify({sessionId:s,runId:"pre-fix",hypothesisId:"D",location:"web/src/lib/data/cart.ts:getOrSetCart",msg:"[DEBUG] cart create failed",data:{status:error?.status??null,statusText:error?.statusText??null,message:error?.message??null,name:error?.name??null,hasAuthorization:Boolean((headers as Record<string,string>).authorization)},ts:Date.now()})}).catch(()=>{})})()
+      // #endregion
+
+      const isMissingCustomer =
+        error?.status === 404 &&
+        typeof error?.message === "string" &&
+        error.message.includes("Customer with id:")
+
+      if (isMissingCustomer && (headers as Record<string, string>).authorization) {
+        await removeAuthToken()
+
+        // #region debug-point E:cart-create-retry-anonymous
+        ;(()=>{const fs=require("fs"),p=".dbg/cart-customer-404.env";let u="http://127.0.0.1:7777/event",s="cart-customer-404";try{const e=fs.readFileSync(p,"utf8");u=e.match(/DEBUG_SERVER_URL=(.+)/)?.[1]||u;s=e.match(/DEBUG_SESSION_ID=(.+)/)?.[1]||s}catch{}fetch(u,{method:"POST",body:JSON.stringify({sessionId:s,runId:"pre-fix",hypothesisId:"E",location:"web/src/lib/data/cart.ts:getOrSetCart",msg:"[DEBUG] retrying cart creation without stale auth",data:{countryCode,regionId:region.id},ts:Date.now()})}).catch(()=>{})})()
+        // #endregion
+
+        const cartResp = await sdk.store.cart.create(
+          { region_id: region.id },
+          {},
+          {}
+        )
+
+        cart = cartResp.cart
+      } else {
+      throw error
+      }
+    }
 
     await setCartId(cart.id)
 
