@@ -10,6 +10,7 @@ import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-relat
 import { notFound } from "next/navigation"
 import ProductActionsWrapper from "./product-actions-wrapper"
 import { HttpTypes } from "@medusajs/types"
+import { Heading } from "@medusajs/ui"
 
 type ProductTemplateProps = {
   product: HttpTypes.StoreProduct
@@ -26,38 +27,70 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
     return notFound()
   }
 
+  const metadata = product.metadata as any || {}
+  const isFrench = ["fr", "be", "ch", "lu", "mc", "ca"].includes(countryCode.toLowerCase())
+
   return (
     <>
-      <div
-        className="content-container flex flex-col small:flex-row small:items-start py-6 relative"
-        data-testid="product-container"
-      >
-        <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
-          <ProductInfo product={product} />
-          <ProductTabs product={product} />
-        </div>
-        <div className="block w-full relative">
-          <ImageGallery images={product?.images || []} />
-        </div>
-        <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-12">
-          <ProductOnboardingCta />
-          <Suspense
-            fallback={
-              <ProductActions
-                disabled={true}
-                product={product}
-                region={region}
-              />
-            }
-          >
-            <ProductActionsWrapper id={product.id} region={region} />
-          </Suspense>
+      {/* Breadcrumb/Back hint */}
+      <div className="content-container py-6">
+        <div className="text-sm text-gray-500">
+          Accueil / Boutique / {product.title}
         </div>
       </div>
+
       <div
-        className="content-container my-16 small:my-32"
+        className="content-container flex flex-col lg:flex-row gap-12 py-8"
+        data-testid="product-container"
+      >
+        {/* Left: Image Gallery */}
+        <div className="lg:w-1/2 w-full">
+          <div className="sticky top-24">
+            <ImageGallery images={product?.images || []} />
+          </div>
+        </div>
+
+        {/* Right: Info & Actions */}
+        <div className="lg:w-1/2 w-full space-y-8">
+          {/* Product Info */}
+          <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm border border-gray-100">
+            <ProductInfo product={product} countryCode={countryCode} />
+          </div>
+
+          {/* Product Actions */}
+          <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm border border-gray-100">
+            <Suspense
+              fallback={
+                <ProductActions
+                  disabled={true}
+                  product={product}
+                  region={region}
+                />
+              }
+            >
+              <ProductActionsWrapper id={product.id} region={region} />
+            </Suspense>
+          </div>
+
+          {/* Product Tabs */}
+          <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm border border-gray-100">
+            <ProductTabs product={product} />
+          </div>
+        </div>
+      </div>
+
+      {/* Related Products */}
+      <div
+        className="content-container my-16 lg:my-24"
         data-testid="related-products-container"
       >
+        <div className="mb-12">
+          <Heading level="h2" className="text-3xl font-bold text-gray-900">
+            {isFrench ? "Vous aimerez aussi" : "You might also like"}
+          </Heading>
+          <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mt-4"></div>
+        </div>
+
         <Suspense fallback={<SkeletonRelatedProducts />}>
           <RelatedProducts product={product} countryCode={countryCode} />
         </Suspense>

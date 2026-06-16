@@ -1,14 +1,16 @@
 import { Metadata } from "next"
 
-import FeaturedProducts from "@modules/home/components/featured-products"
 import Hero from "@modules/home/components/hero"
-import { listCollections } from "@lib/data/collections"
+import { listCategories } from "@lib/data/categories"
 import { getRegion } from "@lib/data/regions"
+import ProductPreview from "@modules/products/components/product-preview"
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: "Medusa Next.js Starter Template",
+  title: "Le Drone Hub",
   description:
-    "A performant frontend ecommerce starter template with Next.js 15 and Medusa.",
+    "Achetez ou louez les meilleurs drones du marché.",
 }
 
 export default async function Home(props: {
@@ -20,20 +22,43 @@ export default async function Home(props: {
 
   const region = await getRegion(countryCode)
 
-  const { collections } = await listCollections({
-    fields: "id, handle, title",
-  })
+  const categories = await listCategories()
 
-  if (!collections || !region) {
+  if (!categories || !region) {
     return null
   }
 
+  const isFrench = countryCode.toLowerCase() === "fr"
+
   return (
     <>
-      <Hero />
+      <Hero countryCode={countryCode} />
       <div className="py-12">
         <ul className="flex flex-col gap-x-6">
-          <FeaturedProducts collections={collections} region={region} />
+          {categories.map((category) => (
+            <li key={category.id} className="content-container py-12 small:py-24">
+              <div className="flex justify-between mb-8">
+                <div>
+                  <p className="mb-2 text-sm font-medium uppercase tracking-[0.25em] text-gray-400">
+                    {isFrench ? "Categorie" : "Category"}
+                  </p>
+                  <h2 className="txt-xlarge font-bold">{category.name}</h2>
+                </div>
+              </div>
+              <ul className="grid grid-cols-2 small:grid-cols-3 gap-x-6 gap-y-24 small:gap-y-36">
+                {category.products?.map((product) => (
+                  <li key={product.id}>
+                    <ProductPreview
+                      product={product as any}
+                      region={region}
+                      countryCode={countryCode}
+                      isFeatured
+                    />
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
         </ul>
       </div>
     </>

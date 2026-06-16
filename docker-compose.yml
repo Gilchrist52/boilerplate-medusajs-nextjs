@@ -27,53 +27,103 @@ services:
       timeout: 3s
       retries: 20
 
-  medusa:
+  migrate:
     build:
       context: ./medusa
-    container_name: medusa_server
+    container_name: medusa_migrate
     env_file:
       - ./.env
     environment:
-      # Database
-      DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa}
-      # CORS
+      DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
+      JWT_SECRET: ${JWT_SECRET:-supersecret}
+      COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
+      NODE_ENV: production
+    command: npx medusa db:migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    build:
+      context: ./medusa
+    container_name: medusa_seed
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
       STORE_CORS: ${STORE_CORS:-http://localhost:3000}
       ADMIN_CORS: ${ADMIN_CORS:-http://localhost:7001}
       AUTH_CORS: ${AUTH_CORS:-http://localhost:3000}
-      # Secrets
       JWT_SECRET: ${JWT_SECRET:-supersecret}
       COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
-      # Optional Redis (used by Medusa for cache/queues)
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       NODE_ENV: production
+    command: npx medusa exec ./src/scripts/seed.ts
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "9000:9000"
-    restart: unless-stopped
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
-  web:
-    build:
-      context: ./web
-      args:
-        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
-        MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
-    container_name: medusa_web
-    env_file:
-      - ./.env
-    environment:
-      NODE_ENV: production
-      # SDK base URL (browser must reach this URL)
-      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
-      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
-    depends_on:
-      - medusa
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
+  # medusa:
+  #   build:
+  #     context: ./medusa
+  #   container_name: medusa_server
+  #   env_file:
+  #     - ./.env
+  #   environment:
+  #     DATABASE_URL: ${DATABASE_URL:-postgresql://medusa:medusa@db:5432/medusa?sslmode=disable}
+  #     STORE_CORS: ${STORE_CORS:-http://localhost:3000}
+  #     ADMIN_CORS: ${ADMIN_CORS:-http://localhost:7001}
+  #     AUTH_CORS: ${AUTH_CORS:-http://localhost:3000}
+  #     JWT_SECRET: ${JWT_SECRET:-supersecret}
+  #     COOKIE_SECRET: ${COOKIE_SECRET:-supersecret}
+  #     REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  #     NODE_ENV: production
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     migrate:
+  #       condition: service_completed_successfully
+  #     seed:
+  #       condition: service_completed_successfully
+  #   ports:
+  #     - "9000:9000"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "wget -qO- http://localhost:9000/health || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 15
+  #     start_period: 30s
+  #   restart: unless-stopped
+
+  # web:
+  #   build:
+  #     context: ./web
+  #     args:
+  #       NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
+  #       MEDUSA_BACKEND_URL: http://medusa:9000
+  #   container_name: medusa_web
+  #   env_file:
+  #     - ./.env
+  #   environment:
+  #     NODE_ENV: production
+  #     MEDUSA_BACKEND_URL: http://medusa:9000
+  #     NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
+  #     NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
+  #     NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-gb}
+  #   depends_on:
+  #     medusa:
+  #       condition: service_healthy
+  #   ports:
+  #     - "3000:3000"
+  #   restart: unless-stopped
 
 volumes:
   postgres_data:

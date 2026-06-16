@@ -5,6 +5,8 @@ import { notFound } from "next/navigation"
 import { retrieveCustomer } from "@lib/data/customer"
 import { listOrders } from "@lib/data/orders"
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "Account",
   description: "Overview of your account activity.",

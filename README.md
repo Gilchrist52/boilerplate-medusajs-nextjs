@@ -1,117 +1,172 @@
-# Boilerplate MedusaJS + Next.js — Docker Setup
+# Boilerplate MedusaJS + Next.js - Procedure Docker
 
-This repository is dockerized to run a full local stack:
+Ce repository peut etre lance entierement avec Docker Compose.
 
-- Postgres 16
-- Redis 7
-- Medusa API (port 9000)
-- Next.js web storefront (port 3000)
+La stack demarree contient :
 
-All Docker artefacts are at the repo root:
+- `db` : Postgres 16
+- `redis` : Redis 7
+- `migrate` : job one-shot pour les migrations Medusa
+- `seed` : job one-shot pour injecter les donnees de demo
+- `medusa` : API Medusa sur le port `9000`
+- `web` : storefront Next.js sur le port `3000`
 
-- `docker-compose.yml`
-- `.env.example` (copy to `.env`)
-- `medusa/Dockerfile`
-- `web/Dockerfile`
+## Prerequis
 
-## Prerequisites
+- Docker Desktop ou Docker Engine avec Compose v2
+- Un fichier `.env` a la racine du projet
 
-- Docker Desktop (or Docker Engine) with Compose v2
-- Node 20+ if you plan to run locally without Docker (not required for Docker)
+## 1. Configuration
 
-## 1) Configure environment variables
+Copie `.env.example` en `.env`, puis ajuste les valeurs si necessaire.
 
-Copy the example file and edit values if needed:
+Exemple :
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
+Sous PowerShell :
 
-- `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` — publishable API key for the storefront.
-- `MEDUSA_BACKEND_URL` — how the browser reaches the Medusa API. Defaults to `http://localhost:9000` in Docker.
+```powershell
+Copy-Item .env.example .env
+```
 
-Medusa API defaults:
+Variables importantes :
 
 - `DATABASE_URL=postgresql://medusa:medusa@db:5432/medusa`
-- `STORE_CORS=http://localhost:3000`
-- `ADMIN_CORS=http://localhost:7001`
-- `AUTH_CORS=http://localhost:3000`
-- `JWT_SECRET` and `COOKIE_SECRET` set to `supersecret` by default (change for real use!)
 - `REDIS_URL=redis://redis:6379`
+- `STORE_CORS=http://localhost:3000`
+- `AUTH_CORS=http://localhost:3000`
+- `ADMIN_CORS=http://localhost:7001`
+- `JWT_SECRET=supersecret`
+- `COOKIE_SECRET=supersecret`
+- `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=...`
+- `MEDUSA_BACKEND_URL=http://localhost:9000`
 
-## 2) Start the stack
+## 2. Demarrage complet
 
-Build containers (first time or after Dockerfile changes):
+Pour construire les images et demarrer toute la stack :
 
 ```bash
-docker compose build
+docker compose up -d --build
 ```
 
-Start containers:
+Ordre logique de demarrage :
+
+1. `db` et `redis`
+2. `migrate`
+3. `seed`
+4. `medusa`
+5. `web`
+
+Le service `seed` est automatique et ne tourne qu'une seule fois. Il cree notamment :
+
+- les regions EUR et USD
+- les produits de demo
+- le client par defaut
+
+## 3. Verifier que tout est pret
+
+Afficher l'etat des conteneurs :
 
 ```bash
-docker compose up -d
+docker compose ps
 ```
 
-Check logs (tail all services):
+Suivre les logs globaux :
 
 ```bash
 docker compose logs -f
 ```
 
-## 3) Access the apps
-
-- Web storefront: http://localhost:3000
-- Medusa API: http://localhost:9000
-- Postgres: localhost:5432 (inside Docker network: `db:5432`)
-- Redis: localhost:6379 (inside Docker network: `redis:6379`)
-
-## 4) Seed sample data (optional)
-
-You can run the Medusa seed script inside the API container:
+Suivre uniquement le seed :
 
 ```bash
-# once containers are running
-# use the compiled seed script inside the container
-docker compose exec medusa sh -lc "node dist/scripts/seed.js"
+docker compose logs -f seed
 ```
 
-This uses the script defined in `medusa/package.json` and `src/scripts/seed.ts`.
+Suivre uniquement Medusa :
 
-## 5) Stopping and cleaning up
+```bash
+docker compose logs -f medusa
+```
 
-Stop containers:
+## 4. Acces aux applications
+
+- Storefront : [http://localhost:3000](http://localhost:3000)
+- API Medusa : [http://localhost:9000](http://localhost:9000)
+- Postgres : `localhost:5432`
+- Redis : `localhost:6379`
+
+## 5. Donnees seedees
+
+Le seed s'execute via le service `seed` du `docker-compose.yml`.
+
+Il cree un client par defaut :
+
+- Email : `customer@ledronehub.test`
+- Mot de passe : `Test1234!`
+
+## 6. Relancer uniquement le seed
+
+Si tu veux rejouer le seed sans relancer toute la stack :
+
+```bash
+docker compose run --rm seed
+```
+
+Attention :
+
+- le seed est idempotent pour certaines donnees, comme le client par defaut
+- si tu veux repartir d'une base totalement propre, il vaut mieux supprimer les volumes puis relancer
+
+## 7. Arret et nettoyage
+
+Arreter la stack :
 
 ```bash
 docker compose down
 ```
 
-Stop and remove volumes (DB data):
+Arreter la stack et supprimer les volumes :
 
 ```bash
 docker compose down -v
 ```
 
-## Environment overview
+Puis relancer proprement :
 
-- Medusa config: `medusa/medusa-config.ts` reads from environment variables such as `DATABASE_URL`, `STORE_CORS`, `ADMIN_CORS`, `AUTH_CORS`, `JWT_SECRET`, `COOKIE_SECRET`.
-- Web config: `web/src/lib/config.ts` reads `MEDUSA_BACKEND_URL` and `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY`.
-- `web/next.config.js` enforces the presence of `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` at startup.
+```bash
+docker compose up -d --build
+```
 
-## Notes
+## 8. Procedure conseillee en local
 
-- Containers run with `NODE_ENV=production` and use `yarn start` within each service.
-- Ports exposed:
-  - Medusa: `9000:9000`
-  - Web: `3000:3000`
-  - Postgres: `5432:5432`
-  - Redis: `6379:6379`
-- Change any values in `.env` and re-run `docker compose up -d`.
+Pour un premier lancement :
 
-## Troubleshooting
+```bash
+docker compose down -v
+docker compose up -d --build
+docker compose ps
+docker compose logs -f seed
+```
 
-- If the web container exits immediately with an env error, ensure `.env` contains `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY`.
-- If Medusa fails to connect to DB, verify `DATABASE_URL` and that the `db` service is healthy (`docker compose ps`).
-- For a clean state, run `docker compose down -v` to remove volumes and start again.
+Ensuite ouvre :
+
+- [http://localhost:3000](http://localhost:3000)
+- [http://localhost:9000](http://localhost:9000)
+
+## 9. Notes techniques
+
+- `migrate` et `seed` sont des jobs one-shot avec `restart: "no"`.
+- `medusa` attend la fin des migrations et du seed avant de demarrer.
+- `web` attend que `medusa` soit en bonne sante.
+- Le seed utilise `medusa exec ./src/scripts/seed.ts`.
+
+## 10. Depannage
+
+- Si `web` ne demarre pas, verifie que `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` est bien renseigne dans `.env`.
+- Si `medusa` ne demarre pas, verifie les logs avec `docker compose logs -f medusa`.
+- Si `seed` echoue, verifie les logs avec `docker compose logs -f seed`.
+- Si la base est dans un etat incoherent, relance depuis zero avec `docker compose down -v`.

@@ -14,7 +14,7 @@ import LineItemOptions from "@modules/common/components/line-item-options"
 import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
-import { usePathname } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { Fragment, useEffect, useRef, useState } from "react"
 
 const CartDropdown = ({
@@ -35,7 +35,26 @@ const CartDropdown = ({
       return acc + item.quantity
     }, 0) || 0
 
-  const subtotal = cartState?.subtotal ?? 0
+  // Calculate custom subtotal that accounts for rental items
+  const calculateCustomSubtotal = () => {
+    let subtotal = 0
+    const items = cartState?.items || []
+    
+    items.forEach((item) => {
+      const metadata = item.metadata as any || {}
+      if (metadata.type === "rental") {
+        // Use the total rental price from metadata (already in dollars/euros, convert to cents)
+        subtotal += Math.round((metadata.total_rental_price || 0) * 100) * (item.quantity || 1)
+      } else {
+        // Use Medusa's calculated subtotal for regular items (already in cents)
+        subtotal += (item.subtotal || 0)
+      }
+    })
+    
+    return subtotal
+  }
+
+  const subtotal = calculateCustomSubtotal()
   const itemRef = useRef<number>(totalItems || 0)
 
   const timedOpen = () => {
@@ -64,6 +83,8 @@ const CartDropdown = ({
   }, [activeTimer])
 
   const pathname = usePathname()
+  const { countryCode } = useParams()
+  const isFrench = String(countryCode || "").toLowerCase() === "fr"
 
   // open cart dropdown when modifying the cart items, but only if we're not on the cart page
   useEffect(() => {
@@ -85,7 +106,7 @@ const CartDropdown = ({
             className="hover:text-ui-fg-base"
             href="/cart"
             data-testid="nav-cart-link"
-          >{`Cart (${totalItems})`}</LocalizedClientLink>
+          >{`${isFrench ? "Panier" : "Cart"} (${totalItems})`}</LocalizedClientLink>
         </PopoverButton>
         <Transition
           show={cartDropdownOpen}
@@ -103,7 +124,7 @@ const CartDropdown = ({
             data-testid="nav-cart-dropdown"
           >
             <div className="p-4 flex items-center justify-center">
-              <h3 className="text-large-semi">Cart</h3>
+              <h3 className="text-large-semi">{isFrench ? "Panier" : "Cart"}</h3>
             </div>
             {cartState && cartState.items?.length ? (
               <>
@@ -114,71 +135,97 @@ const CartDropdown = ({
                         ? -1
                         : 1
                     })
-                    .map((item) => (
-                      <div
-                        className="grid grid-cols-[122px_1fr] gap-x-4"
-                        key={item.id}
-                        data-testid="cart-item"
-                      >
-                        <LocalizedClientLink
-                          href={`/products/${item.product_handle}`}
-                          className="w-24"
+                    .map((item) => {
+                      const metadata = item.metadata as any || {}
+                      const isRental = metadata.type === "rental"
+                      
+                      return (
+                        <div
+                          className="grid grid-cols-[122px_1fr] gap-x-4"
+                          key={item.id}
+                          data-testid="cart-item"
                         >
-                          <Thumbnail
-                            thumbnail={item.thumbnail}
-                            images={item.variant?.product?.images}
-                            size="square"
-                          />
-                        </LocalizedClientLink>
-                        <div className="flex flex-col justify-between flex-1">
-                          <div className="flex flex-col flex-1">
-                            <div className="flex items-start justify-between">
-                              <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
-                                <h3 className="text-base-regular overflow-hidden text-ellipsis">
-                                  <LocalizedClientLink
-                                    href={`/products/${item.product_handle}`}
-                                    data-testid="product-link"
+                          <LocalizedClientLink
+                            href={`/products/${item.product_handle}`}
+                            className="w-24"
+                          >
+                            <Thumbnail
+                              thumbnail={item.thumbnail}
+                              images={item.variant?.product?.images}
+                              size="square"
+                            />
+                          </LocalizedClientLink>
+                          <div className="flex flex-col justify-between flex-1">
+                            <div className="flex flex-col flex-1">
+                              <div className="flex items-start justify-between">
+                                <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
+                                  <h3 className="text-base-regular overflow-hidden text-ellipsis">
+                                    <LocalizedClientLink
+                                      href={`/products/${item.product_handle}`}
+                                      data-testid="product-link"
+                                    >
+                                      {item.title}
+                                      {isRental && (
+                                        <span className="text-xs text-ui-fg-muted ml-2">
+                                          {isFrench ? "(Location)" : "(Rental)"}
+                                        </span>
+                                      )}
+                                    </LocalizedClientLink>
+                                  </h3>
+                                  <LineItemOptions
+                                    variant={item.variant}
+                                    data-testid="cart-item-variant"
+                                    data-value={item.variant}
+                                  />
+                                  {isRental && metadata.rental_start && metadata.rental_end && (
+                                    <span className="text-xs text-ui-fg-subtle">
+                                      Du {new Date(metadata.rental_start).toLocaleDateString()} au {new Date(metadata.rental_end).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                  <span
+                                    data-testid="cart-item-quantity"
+                                    data-value={item.quantity}
                                   >
-                                    {item.title}
-                                  </LocalizedClientLink>
-                                </h3>
-                                <LineItemOptions
-                                  variant={item.variant}
-                                  data-testid="cart-item-variant"
-                                  data-value={item.variant}
-                                />
-                                <span
-                                  data-testid="cart-item-quantity"
-                                  data-value={item.quantity}
-                                >
-                                  Quantity: {item.quantity}
-                                </span>
-                              </div>
-                              <div className="flex justify-end">
-                                <LineItemPrice
-                                  item={item}
-                                  style="tight"
-                                  currencyCode={cartState.currency_code}
-                                />
+                                    {isFrench ? "Quantite" : "Quantity"}: {item.quantity}
+                                  </span>
+                                </div>
+                                <div className="flex justify-end">
+                                  {isRental ? (
+                                    <span className="text-base-regular">
+                                      {convertToLocale({
+                                        amount: Math.round((metadata.total_rental_price || 0) * 100) * item.quantity,
+                                        currency_code: cartState.currency_code || "eur",
+                                      })}
+                                    </span>
+                                  ) : (
+                                    <LineItemPrice
+                                      item={item}
+                                      style="tight"
+                                      currencyCode={cartState.currency_code}
+                                    />
+                                  )}
+                                </div>
                               </div>
                             </div>
+                            <DeleteButton
+                              id={item.id}
+                              className="mt-1"
+                              data-testid="cart-item-remove-button"
+                            >
+                              Remove
+                            </DeleteButton>
                           </div>
-                          <DeleteButton
-                            id={item.id}
-                            className="mt-1"
-                            data-testid="cart-item-remove-button"
-                          >
-                            Remove
-                          </DeleteButton>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                 </div>
                 <div className="p-4 flex flex-col gap-y-4 text-small-regular">
                   <div className="flex items-center justify-between">
                     <span className="text-ui-fg-base font-semibold">
                       Subtotal{" "}
-                      <span className="font-normal">(excl. taxes)</span>
+                      <span className="font-normal">
+                        {isFrench ? "(hors taxes)" : "(excl. taxes)"}
+                      </span>
                     </span>
                     <span
                       className="text-large-semi"
@@ -187,7 +234,7 @@ const CartDropdown = ({
                     >
                       {convertToLocale({
                         amount: subtotal,
-                        currency_code: cartState.currency_code,
+                        currency_code: cartState.currency_code || "eur",
                       })}
                     </span>
                   </div>
@@ -197,7 +244,7 @@ const CartDropdown = ({
                       size="large"
                       data-testid="go-to-cart-button"
                     >
-                      Go to cart
+                      {isFrench ? "Voir le panier" : "Go to cart"}
                     </Button>
                   </LocalizedClientLink>
                 </div>
@@ -208,12 +255,22 @@ const CartDropdown = ({
                   <div className="bg-gray-900 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
                     <span>0</span>
                   </div>
-                  <span>Your shopping bag is empty.</span>
+                  <span>
+                    {isFrench
+                      ? "Votre panier est vide."
+                      : "Your shopping bag is empty."}
+                  </span>
                   <div>
                     <LocalizedClientLink href="/store">
                       <>
-                        <span className="sr-only">Go to all products page</span>
-                        <Button onClick={close}>Explore products</Button>
+                        <span className="sr-only">
+                          {isFrench
+                            ? "Aller a la page des produits"
+                            : "Go to all products page"}
+                        </span>
+                        <Button onClick={close}>
+                          {isFrench ? "Explorer les produits" : "Explore products"}
+                        </Button>
                       </>
                     </LocalizedClientLink>
                   </div>

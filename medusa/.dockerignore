@@ -6,3 +6,5 @@ yarn-error.log
 dist
 coverage
 .env
+.medusa
+.yarn/cache

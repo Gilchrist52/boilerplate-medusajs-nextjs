@@ -4,6 +4,26 @@ import React from "react"
 
 import PlaceholderImage from "@modules/common/icons/placeholder-image"
 
+const DRONE_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1507582020474-9a35b7d455d9?w=1200&h=1200&fit=crop"
+
+const normalizeImageUrl = (image?: string | null) => {
+  if (!image) {
+    return undefined
+  }
+
+  const brokenUnsplashIds = [
+    "photo-1473968512647-3e44724fafca",
+    "photo-1480481030867-23076041782b",
+  ]
+
+  if (brokenUnsplashIds.some((id) => image.includes(id))) {
+    return DRONE_FALLBACK_IMAGE
+  }
+
+  return image
+}
+
 type ThumbnailProps = {
   thumbnail?: string | null
   // TODO: Fix image typings
@@ -22,7 +42,7 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
   className,
   "data-testid": dataTestid,
 }) => {
-  const initialImage = thumbnail || images?.[0]?.url
+  const initialImage = normalizeImageUrl(thumbnail || images?.[0]?.url)
 
   return (
     <Container

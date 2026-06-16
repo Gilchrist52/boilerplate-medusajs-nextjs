@@ -16,7 +16,7 @@
     "build": "medusa build",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "start": "medusa start",
-    "dev": "medusa develop",
+    "dev": "dotenv -e .env.local -- medusa develop",
     "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
@@ -42,6 +42,7 @@
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.2",
     "@types/react-dom": "^18.2.25",
+    "dotenv-cli": "^11.0.0",
     "jest": "^29.7.0",
     "prop-types": "^15.8.1",
     "react": "^18.2.0",

@@ -1,39 +1,33 @@
-# Medusa service Dockerfile
-# Use Node 20 LTS
 FROM node:20-alpine AS base
-
-# Set working directory
 WORKDIR /app
 
-# Install dependencies (use yarn)
-RUN corepack enable
+RUN corepack enable && corepack prepare yarn@3.2.3 --activate
 
-# Copy package files
-COPY package.json yarn.lock ./
+ENV YARN_HTTP_TIMEOUT=300000
 
-# Install deps
-RUN yarn install --frozen-lockfile
-
-# Copy the rest of the source code
 COPY . .
 
-# Build Medusa project
+RUN yarn install --immutable
+
 RUN yarn build
 
-# Production image
+# ─── Runner ───────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy node_modules and build artifacts from builder
-COPY --from=base /app/node_modules ./node_modules
-# Medusa build outputs to .medusa/server per tsconfig.json
+RUN corepack enable && corepack prepare yarn@3.2.3 --activate
+
+# Copier le build complet avec ses node_modules déjà installés
 COPY --from=base /app/.medusa/server ./.medusa/server
-COPY package.json ./package.json
-COPY medusa-config.ts ./medusa-config.ts
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/yarn.lock ./yarn.lock
+COPY --from=base /app/.yarnrc.yml ./.yarnrc.yml
+COPY --from=base /app/src ./src
+COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/medusa-config.ts ./medusa-config.ts
+COPY --from=base /app/tsconfig.json ./tsconfig.json
 
-# Expose Medusa default port
 EXPOSE 9000
-
-# Start Medusa server
-CMD ["yarn", "start"]
+# medusa start est disponible via node_modules/.bin
+CMD ["node_modules/.bin/medusa", "start"]

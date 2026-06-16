@@ -6,6 +6,8 @@ import AddressBook from "@modules/account/components/address-book"
 import { getRegion } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "Addresses",
   description: "View your addresses",

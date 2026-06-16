@@ -6,6 +6,7 @@ import {
 } from "@medusajs/framework/utils";
 import {
   createApiKeysWorkflow,
+  createCustomerAccountWorkflow,
   createInventoryLevelsWorkflow,
   createProductCategoriesWorkflow,
   createProductsWorkflow,
@@ -27,8 +28,16 @@ export default async function seedDemoData({ container }: ExecArgs) {
   const fulfillmentModuleService = container.resolve(Modules.FULFILLMENT);
   const salesChannelModuleService = container.resolve(Modules.SALES_CHANNEL);
   const storeModuleService = container.resolve(Modules.STORE);
+  const customerModuleService = container.resolve(Modules.CUSTOMER);
+  const authModuleService = container.resolve(Modules.AUTH);
 
-  const countries = ["gb", "de", "dk", "se", "fr", "es", "it"];
+  const countries = ["gb", "de", "dk", "se", "fr", "es", "it", "us"];
+  const defaultCustomer = {
+    email: "customer@ledronehub.test",
+    password: "Test1234!",
+    first_name: "John",
+    last_name: "Doe",
+  };
 
   logger.info("Seeding store data...");
   const [store] = await storeModuleService.listStores();
@@ -76,13 +85,19 @@ export default async function seedDemoData({ container }: ExecArgs) {
         {
           name: "Europe",
           currency_code: "eur",
-          countries,
+          countries: ["gb", "de", "dk", "se", "fr", "es", "it"],
+          payment_providers: ["pp_system_default"],
+        },
+        {
+          name: "USA",
+          currency_code: "usd",
+          countries: ["us"],
           payment_providers: ["pp_system_default"],
         },
       ],
     },
   });
-  const region = regionResult[0];
+  const regions = regionResult;
   logger.info("Finished seeding regions.");
 
   logger.info("Seeding tax regions...");
@@ -189,6 +204,15 @@ export default async function seedDemoData({ container }: ExecArgs) {
           },
         ],
       },
+      {
+        name: "USA",
+        geo_zones: [
+          {
+            country_code: "us",
+            type: "country",
+          },
+        ],
+      },
     ],
   });
 
@@ -223,10 +247,6 @@ export default async function seedDemoData({ container }: ExecArgs) {
             currency_code: "eur",
             amount: 10,
           },
-          {
-            region_id: region.id,
-            amount: 10,
-          },
         ],
         rules: [
           {
@@ -259,10 +279,6 @@ export default async function seedDemoData({ container }: ExecArgs) {
           },
           {
             currency_code: "eur",
-            amount: 10,
-          },
-          {
-            region_id: region.id,
             amount: 10,
           },
         ],
@@ -313,7 +329,60 @@ export default async function seedDemoData({ container }: ExecArgs) {
       add: [defaultSalesChannel[0].id],
     },
   });
+  
+  // Afficher la clé générée pour pouvoir la mettre dans le .env
+  logger.info("-----------------------------------------------------");
+  logger.info("PUBLISHABLE KEY GÉNÉRÉE :");
+  logger.info(publishableApiKey.token);
+  logger.info("-----------------------------------------------------");
+  
   logger.info("Finished seeding publishable API key data.");
+
+  logger.info("Seeding default customer account...");
+
+  const existingCustomers = await customerModuleService.listCustomers({
+    email: defaultCustomer.email,
+  });
+
+  if (existingCustomers.length) {
+    logger.info(
+      `Default customer already exists: ${defaultCustomer.email}`
+    );
+  } else {
+    const authResponse = await authModuleService.register("emailpass", {
+      body: {
+        email: defaultCustomer.email,
+        password: defaultCustomer.password,
+      },
+    });
+
+    if (!authResponse.success || !authResponse.authIdentity?.id) {
+      throw new Error(
+        `Unable to register default customer identity: ${
+          authResponse.error || "unknown auth error"
+        }`
+      );
+    }
+
+    await createCustomerAccountWorkflow(container).run({
+      input: {
+        authIdentityId: authResponse.authIdentity.id,
+        customerData: {
+          email: defaultCustomer.email,
+          first_name: defaultCustomer.first_name,
+          last_name: defaultCustomer.last_name,
+        },
+      },
+    });
+
+    logger.info("-----------------------------------------------------");
+    logger.info("DEFAULT CUSTOMER CREATED:");
+    logger.info(`Email: ${defaultCustomer.email}`);
+    logger.info(`Password: ${defaultCustomer.password}`);
+    logger.info("-----------------------------------------------------");
+  }
+
+  logger.info("Finished seeding default customer account.");
 
   logger.info("Seeding product data...");
 
@@ -323,19 +392,11 @@ export default async function seedDemoData({ container }: ExecArgs) {
     input: {
       product_categories: [
         {
-          name: "Shirts",
+          name: "Drones Professionnels",
           is_active: true,
         },
         {
-          name: "Sweatshirts",
-          is_active: true,
-        },
-        {
-          name: "Pants",
-          is_active: true,
-        },
-        {
-          name: "Merch",
+          name: "Drones Loisirs",
           is_active: true,
         },
       ],
@@ -346,181 +407,58 @@ export default async function seedDemoData({ container }: ExecArgs) {
     input: {
       products: [
         {
-          title: "Medusa T-Shirt",
+          title: "DJI Mini 4 Pro",
           category_ids: [
-            categoryResult.find((cat) => cat.name === "Shirts")!.id,
+            categoryResult.find((cat) => cat.name === "Drones Loisirs")!.id,
           ],
           description:
-            "Reimagine the feeling of a classic T-shirt. With our cotton T-shirts, everyday essentials no longer have to be ordinary.",
-          handle: "t-shirt",
-          weight: 400,
+            "Le drone compact parfait pour capturer des moments incroyables en 4K HDR.",
+          handle: "dji-mini-4-pro",
+          weight: 249,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
+          metadata: {
+            mode_commercialisation: "both", // "sale", "rental", "both"
+            tarif_location_journalier_eur: 25,
+            tarif_location_journalier_usd: 27,
+            title_fr: "DJI Mini 4 Pro",
+            description_fr:
+              "Le drone compact parfait pour capturer des moments incroyables en 4K HDR.",
+            title_en: "DJI Mini 4 Pro",
+            description_en:
+              "The perfect compact drone to capture incredible moments in 4K HDR.",
+            specifications: {
+              camera: "4K HDR, 48MP",
+              flight_time: "34 min",
+              weight: "249g",
+              range: "16 km",
+            },
+          },
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-back.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-back.png",
+              url: "https://images.unsplash.com/photo-1507582020474-9a35b7d455d9?w=600&h=400&fit=crop",
             },
           ],
           options: [
             {
-              title: "Size",
-              values: ["S", "M", "L", "XL"],
-            },
-            {
-              title: "Color",
-              values: ["Black", "White"],
+              title: "Default",
+              values: ["Default"],
             },
           ],
           variants: [
             {
-              title: "S / Black",
-              sku: "SHIRT-S-BLACK",
+              title: "Standard",
+              sku: "DJI-MINI-4-PRO",
               options: {
-                Size: "S",
-                Color: "Black",
+                Default: "Default",
               },
               prices: [
                 {
-                  amount: 10,
+                  amount: 79900, // en centimes (799€)
                   currency_code: "eur",
                 },
                 {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "S / White",
-              sku: "SHIRT-S-WHITE",
-              options: {
-                Size: "S",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "M / Black",
-              sku: "SHIRT-M-BLACK",
-              options: {
-                Size: "M",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "M / White",
-              sku: "SHIRT-M-WHITE",
-              options: {
-                Size: "M",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "L / Black",
-              sku: "SHIRT-L-BLACK",
-              options: {
-                Size: "L",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "L / White",
-              sku: "SHIRT-L-WHITE",
-              options: {
-                Size: "L",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "XL / Black",
-              sku: "SHIRT-XL-BLACK",
-              options: {
-                Size: "XL",
-                Color: "Black",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "XL / White",
-              sku: "SHIRT-XL-WHITE",
-              options: {
-                Size: "XL",
-                Color: "White",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
+                  amount: 89900, // en centimes (899$)
                   currency_code: "usd",
                 },
               ],
@@ -533,95 +471,58 @@ export default async function seedDemoData({ container }: ExecArgs) {
           ],
         },
         {
-          title: "Medusa Sweatshirt",
+          title: "DJI Air 3",
           category_ids: [
-            categoryResult.find((cat) => cat.name === "Sweatshirts")!.id,
+            categoryResult.find((cat) => cat.name === "Drones Professionnels")!.id,
           ],
           description:
-            "Reimagine the feeling of a classic sweatshirt. With our cotton sweatshirt, everyday essentials no longer have to be ordinary.",
-          handle: "sweatshirt",
-          weight: 400,
+            "Drone polyvalent avec double caméra pour des prises de vue professionnelles.",
+          handle: "dji-air-3",
+          weight: 560,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
+          metadata: {
+            mode_commercialisation: "both",
+            tarif_location_journalier_eur: 45,
+            tarif_location_journalier_usd: 49,
+            title_fr: "DJI Air 3",
+            description_fr:
+              "Drone polyvalent avec double caméra pour des prises de vue professionnelles.",
+            title_en: "DJI Air 3",
+            description_en:
+              "Versatile drone with dual camera for professional footage.",
+            specifications: {
+              camera: "4K/60fps, 48MP",
+              flight_time: "46 min",
+              weight: "560g",
+              range: "20 km",
+            },
+          },
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-back.png",
+              url: "https://images.unsplash.com/photo-1507582020474-9a35b7d455d9?w=600&h=400&fit=crop",
             },
           ],
           options: [
             {
-              title: "Size",
-              values: ["S", "M", "L", "XL"],
+              title: "Default",
+              values: ["Default"],
             },
           ],
           variants: [
             {
-              title: "S",
-              sku: "SWEATSHIRT-S",
+              title: "Standard",
+              sku: "DJI-AIR-3",
               options: {
-                Size: "S",
+                Default: "Default",
               },
               prices: [
                 {
-                  amount: 10,
+                  amount: 109900, // 1099€
                   currency_code: "eur",
                 },
                 {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SWEATSHIRT-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SWEATSHIRT-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SWEATSHIRT-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
+                  amount: 119900, // 1199$
                   currency_code: "usd",
                 },
               ],
@@ -634,196 +535,58 @@ export default async function seedDemoData({ container }: ExecArgs) {
           ],
         },
         {
-          title: "Medusa Sweatpants",
+          title: "DJI Mavic 3 Classic",
           category_ids: [
-            categoryResult.find((cat) => cat.name === "Pants")!.id,
+            categoryResult.find((cat) => cat.name === "Drones Professionnels")!.id,
           ],
           description:
-            "Reimagine the feeling of classic sweatpants. With our cotton sweatpants, everyday essentials no longer have to be ordinary.",
-          handle: "sweatpants",
-          weight: 400,
+            "Drone haut de gamme avec capteur Hasselblad pour des photos exceptionnelles.",
+          handle: "dji-mavic-3-classic",
+          weight: 895,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
+          metadata: {
+            mode_commercialisation: "rental",
+            tarif_location_journalier_eur: 75,
+            tarif_location_journalier_usd: 82,
+            title_fr: "DJI Mavic 3 Classic",
+            description_fr:
+              "Drone haut de gamme avec capteur Hasselblad pour des photos exceptionnelles.",
+            title_en: "DJI Mavic 3 Classic",
+            description_en:
+              "Premium drone with Hasselblad sensor for exceptional photos.",
+            specifications: {
+              camera: "4/3 CMOS Hasselblad, 20MP",
+              flight_time: "46 min",
+              weight: "895g",
+              range: "20 km",
+            },
+          },
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-back.png",
+              url: "https://images.unsplash.com/photo-1507582020474-9a35b7d455d9?w=600&h=400&fit=crop",
             },
           ],
           options: [
             {
-              title: "Size",
-              values: ["S", "M", "L", "XL"],
+              title: "Default",
+              values: ["Default"],
             },
           ],
           variants: [
             {
-              title: "S",
-              sku: "SWEATPANTS-S",
+              title: "Standard",
+              sku: "DJI-MAVIC-3-CLASSIC",
               options: {
-                Size: "S",
+                Default: "Default",
               },
               prices: [
                 {
-                  amount: 10,
+                  amount: 199900, // 1999€ pour la vente (même si mode rental, il faut un prix)
                   currency_code: "eur",
                 },
                 {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SWEATPANTS-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SWEATPANTS-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SWEATPANTS-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-          ],
-          sales_channels: [
-            {
-              id: defaultSalesChannel[0].id,
-            },
-          ],
-        },
-        {
-          title: "Medusa Shorts",
-          category_ids: [
-            categoryResult.find((cat) => cat.name === "Merch")!.id,
-          ],
-          description:
-            "Reimagine the feeling of classic shorts. With our cotton shorts, everyday essentials no longer have to be ordinary.",
-          handle: "shorts",
-          weight: 400,
-          status: ProductStatus.PUBLISHED,
-          shipping_profile_id: shippingProfile.id,
-          images: [
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-front.png",
-            },
-            {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-back.png",
-            },
-          ],
-          options: [
-            {
-              title: "Size",
-              values: ["S", "M", "L", "XL"],
-            },
-          ],
-          variants: [
-            {
-              title: "S",
-              sku: "SHORTS-S",
-              options: {
-                Size: "S",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "M",
-              sku: "SHORTS-M",
-              options: {
-                Size: "M",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "L",
-              sku: "SHORTS-L",
-              options: {
-                Size: "L",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
-            },
-            {
-              title: "XL",
-              sku: "SHORTS-XL",
-              options: {
-                Size: "XL",
-              },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
+                  amount: 219900, // 2199$
                   currency_code: "usd",
                 },
               ],
@@ -864,4 +627,5 @@ export default async function seedDemoData({ container }: ExecArgs) {
   });
 
   logger.info("Finished seeding inventory levels data.");
+
 }

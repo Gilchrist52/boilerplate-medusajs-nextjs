@@ -3,31 +3,39 @@ import { listCollections } from "@lib/data/collections"
 import { Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import LanguageSwitcher from "@modules/layout/components/language-switcher"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
 
-export default async function Footer() {
+export default async function Footer({ countryCode }: { countryCode: string }) {
   const { collections } = await listCollections({
     fields: "*products",
   })
   const productCategories = await listCategories()
+  const isFrench = countryCode.toLowerCase() === "fr"
 
   return (
-    <footer className="border-t border-ui-border-base w-full">
+    <footer className="w-full border-t border-gray-200 bg-gradient-to-b from-white to-gray-50">
       <div className="content-container flex flex-col w-full">
-        <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
-          <div>
+        <div className="flex flex-col gap-y-10 xsmall:flex-row items-start justify-between py-24">
+          <div className="max-w-sm space-y-5">
             <LocalizedClientLink
               href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
+              className="text-xl font-extrabold uppercase tracking-[0.25em] text-gray-900 hover:text-blue-600"
             >
-              Medusa Store
+              Le Drone Hub
             </LocalizedClientLink>
+            <Text className="text-sm leading-6 text-gray-500">
+              {isFrench
+                ? "Marketplace de drones moderne pour l'achat et la location, avec expérience FR/EN et gestion multi-devises."
+                : "Modern drone marketplace for purchase and rental, with FR/EN experience and multi-currency support."}
+            </Text>
+            <LanguageSwitcher countryCode={countryCode} />
           </div>
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
               <div className="flex flex-col gap-y-2">
                 <span className="txt-small-plus txt-ui-fg-base">
-                  Categories
+                  {isFrench ? "Categories" : "Categories"}
                 </span>
                 <ul
                   className="grid grid-cols-1 gap-2"
@@ -85,7 +93,7 @@ export default async function Footer() {
             {collections && collections.length > 0 && (
               <div className="flex flex-col gap-y-2">
                 <span className="txt-small-plus txt-ui-fg-base">
-                  Collections
+                  {isFrench ? "Collections" : "Collections"}
                 </span>
                 <ul
                   className={clx(
@@ -109,7 +117,9 @@ export default async function Footer() {
               </div>
             )}
             <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">Medusa</span>
+              <span className="txt-small-plus txt-ui-fg-base">
+                {isFrench ? "Ressources" : "Resources"}
+              </span>
               <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
                 <li>
                   <a
@@ -128,7 +138,7 @@ export default async function Footer() {
                     rel="noreferrer"
                     className="hover:text-ui-fg-base"
                   >
-                    Documentation
+                    {isFrench ? "Documentation" : "Documentation"}
                   </a>
                 </li>
                 <li>
@@ -138,18 +148,19 @@ export default async function Footer() {
                     rel="noreferrer"
                     className="hover:text-ui-fg-base"
                   >
-                    Source code
+                    {isFrench ? "Code source" : "Source code"}
                   </a>
                 </li>
               </ul>
             </div>
           </div>
         </div>
-        <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
+        <div className="flex w-full mb-12 justify-between text-ui-fg-muted gap-4 flex-col small:flex-row">
           <Text className="txt-compact-small">
-            © {new Date().getFullYear()} Medusa Store. All rights reserved.
+            © {new Date().getFullYear()} Le Drone Hub.{" "}
+            {isFrench ? "Tous droits réservés." : "All rights reserved."}
           </Text>
-          <MedusaCTA />
+          <MedusaCTA isFrench={isFrench} />
         </div>
       </div>
     </footer>

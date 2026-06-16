@@ -6,18 +6,25 @@ import { Text, clx, useToggleState } from "@medusajs/ui"
 import { Fragment } from "react"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import LanguageSwitcher from "../language-switcher"
 import CountrySelect from "../country-select"
 import { HttpTypes } from "@medusajs/types"
 
-const SideMenuItems = {
-  Home: "/",
-  Store: "/store",
-  Account: "/account",
-  Cart: "/cart",
-}
-
-const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
+const SideMenu = ({
+  regions,
+  countryCode,
+}: {
+  regions: HttpTypes.StoreRegion[] | null
+  countryCode: string
+}) => {
   const toggleState = useToggleState()
+  const isFrench = countryCode.toLowerCase() === "fr"
+  const sideMenuItems = [
+    { label: isFrench ? "Accueil" : "Home", href: "/" },
+    { label: isFrench ? "Catalogue" : "Store", href: "/store" },
+    { label: isFrench ? "Compte" : "Account", href: "/account" },
+    { label: isFrench ? "Panier" : "Cart", href: "/cart" },
+  ]
 
   return (
     <div className="h-full">
@@ -28,9 +35,9 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
               <div className="relative flex h-full">
                 <Popover.Button
                   data-testid="nav-menu-button"
-                  className="relative h-full flex items-center transition-all ease-out duration-200 focus:outline-none hover:text-ui-fg-base"
+                  className="relative h-full flex items-center rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all ease-out duration-200 hover:border-gray-300 hover:text-gray-950 focus:outline-none"
                 >
-                  Menu
+                  {isFrench ? "Menu" : "Menu"}
                 </Popover.Button>
               </div>
 
@@ -47,24 +54,27 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                 <PopoverPanel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-30 inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
                   <div
                     data-testid="nav-menu-popup"
-                    className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6"
+                    className="flex flex-col h-full rounded-3xl border border-white/10 bg-[rgba(3,7,18,0.78)] justify-between p-6"
                   >
                     <div className="flex justify-end" id="xmark">
                       <button data-testid="close-menu-button" onClick={close}>
                         <XMark />
                       </button>
                     </div>
+                    <div className="mb-8">
+                      <LanguageSwitcher countryCode={countryCode} compact />
+                    </div>
                     <ul className="flex flex-col gap-6 items-start justify-start">
-                      {Object.entries(SideMenuItems).map(([name, href]) => {
+                      {sideMenuItems.map(({ label, href }) => {
                         return (
-                          <li key={name}>
+                          <li key={label}>
                             <LocalizedClientLink
                               href={href}
                               className="text-3xl leading-10 hover:text-ui-fg-disabled"
                               onClick={close}
-                              data-testid={`${name.toLowerCase()}-link`}
+                              data-testid={`${label.toLowerCase()}-link`}
                             >
-                              {name}
+                              {label}
                             </LocalizedClientLink>
                           </li>
                         )
@@ -90,8 +100,8 @@ const SideMenu = ({ regions }: { regions: HttpTypes.StoreRegion[] | null }) => {
                         />
                       </div>
                       <Text className="flex justify-between txt-compact-small">
-                        © {new Date().getFullYear()} Medusa Store. All rights
-                        reserved.
+                        © {new Date().getFullYear()} Le Drone Hub.{" "}
+                        {isFrench ? "Tous droits réservés." : "All rights reserved."}
                       </Text>
                     </div>
                   </div>

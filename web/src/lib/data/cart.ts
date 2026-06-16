@@ -115,10 +115,12 @@ export async function addToCart({
   variantId,
   quantity,
   countryCode,
+  metadata,
 }: {
   variantId: string
   quantity: number
   countryCode: string
+  metadata?: Record<string, any>
 }) {
   if (!variantId) {
     throw new Error("Missing variant ID when adding to cart")
@@ -140,6 +142,7 @@ export async function addToCart({
       {
         variant_id: variantId,
         quantity,
+        metadata,
       },
       {},
       headers
@@ -452,6 +455,13 @@ export async function updateRegion(countryCode: string, currentPath: string) {
 
 export async function listCartOptions() {
   const cartId = await getCartId()
+
+  if (!cartId) {
+    return {
+      shipping_options: [],
+    }
+  }
+
   const headers = {
     ...(await getAuthHeaders()),
   }
@@ -466,5 +476,7 @@ export async function listCartOptions() {
     next,
     headers,
     cache: "force-cache",
-  })
+  }).catch(() => ({
+    shipping_options: [],
+  }))
 }

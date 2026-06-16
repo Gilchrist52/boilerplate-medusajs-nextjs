@@ -9,24 +9,33 @@ import Footer from "@modules/layout/templates/footer"
 import Nav from "@modules/layout/templates/nav"
 import FreeShippingPriceNudge from "@modules/shipping/components/free-shipping-price-nudge"
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
 }
 
-export default async function PageLayout(props: { children: React.ReactNode }) {
+export default async function PageLayout(props: {
+  children: React.ReactNode
+  params: Promise<{ countryCode: string }>
+}) {
+  const params = await props.params
+  const { countryCode } = params
   const customer = await retrieveCustomer()
   const cart = await retrieveCart()
   let shippingOptions: StoreCartShippingOption[] = []
 
   if (cart) {
-    const { shipping_options } = await listCartOptions()
+    const { shipping_options } = await listCartOptions().catch(() => ({
+      shipping_options: [],
+    }))
 
     shippingOptions = shipping_options
   }
 
   return (
     <>
-      <Nav />
+      <Nav countryCode={countryCode} />
       {customer && cart && (
         <CartMismatchBanner customer={customer} cart={cart} />
       )}
@@ -39,7 +48,7 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
         />
       )}
       {props.children}
-      <Footer />
+      <Footer countryCode={countryCode} />
     </>
   )
 }

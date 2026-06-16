@@ -10,6 +10,8 @@ import { notFound } from "next/navigation"
 import { listRegions } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "Profile",
   description: "View and edit your Medusa Store profile.",

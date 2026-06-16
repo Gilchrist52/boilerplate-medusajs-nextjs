@@ -23,6 +23,8 @@ type ItemProps = {
 const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const metadata = item.metadata as any || {}
+  const isRental = metadata.type === "rental"
 
   const changeQuantity = async (quantity: number) => {
     setError(null)
@@ -63,13 +65,23 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
       </Table.Cell>
 
       <Table.Cell className="text-left">
-        <Text
+        <div
           className="txt-medium-plus text-ui-fg-base"
           data-testid="product-title"
         >
-          {item.product_title}
-        </Text>
+          <span>{item.product_title}</span>
+          {isRental && (
+            <span className="txt-small text-ui-fg-muted ml-2">
+              (Location)
+            </span>
+          )}
+        </div>
         <LineItemOptions variant={item.variant} data-testid="product-variant" />
+        {isRental && metadata.rental_start && metadata.rental_end && (
+          <Text className="txt-small text-ui-fg-subtle mt-1">
+            Du {new Date(metadata.rental_start).toLocaleDateString()} au {new Date(metadata.rental_end).toLocaleDateString()} ({metadata.rental_days} {metadata.rental_days > 1 ? "jours" : "jour"})
+          </Text>
+        )}
       </Table.Cell>
 
       {type === "full" && (
@@ -106,11 +118,17 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
 
       {type === "full" && (
         <Table.Cell className="hidden small:table-cell">
-          <LineItemUnitPrice
-            item={item}
-            style="tight"
-            currencyCode={currencyCode}
-          />
+          {isRental ? (
+            <Text className="txt-medium text-ui-fg-base">
+              {currencyCode === "eur" ? "€" : "$"}{metadata.total_rental_price} / jour
+            </Text>
+          ) : (
+            <LineItemUnitPrice
+              item={item}
+              style="tight"
+              currencyCode={currencyCode}
+            />
+          )}
         </Table.Cell>
       )}
 
@@ -123,18 +141,30 @@ const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
           {type === "preview" && (
             <span className="flex gap-x-1 ">
               <Text className="text-ui-fg-muted">{item.quantity}x </Text>
-              <LineItemUnitPrice
-                item={item}
-                style="tight"
-                currencyCode={currencyCode}
-              />
+              {isRental ? (
+                <Text className="txt-medium text-ui-fg-base">
+                  {currencyCode === "eur" ? "€" : "$"}{metadata.total_rental_price}
+                </Text>
+              ) : (
+                <LineItemUnitPrice
+                  item={item}
+                  style="tight"
+                  currencyCode={currencyCode}
+                />
+              )}
             </span>
           )}
-          <LineItemPrice
-            item={item}
-            style="tight"
-            currencyCode={currencyCode}
-          />
+          {isRental ? (
+            <Text className="txt-medium-plus text-ui-fg-base">
+              {currencyCode === "eur" ? "€" : "$"}{metadata.total_rental_price}
+            </Text>
+          ) : (
+            <LineItemPrice
+              item={item}
+              style="tight"
+              currencyCode={currencyCode}
+            />
+          )}
         </span>
       </Table.Cell>
     </Table.Row>
